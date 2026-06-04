@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Smart Clothing Fit Recommendation</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    display: flex;
+    background: #f4f6f9;
+}
+
+/* SIDEBAR */
+.sidebar {
+    width: 260px;
+    background: #1e293b;
+    color: white;
+    padding: 20px;
+}
+.sidebar h2 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+.sidebar button {
+    width: 100%;
+    padding: 14px;
+    margin: 10px 0;
+    border: none;
+    cursor: pointer;
+    background: #334155;
+    color: white;
+    font-size: 15px;
+    text-align: left;
+}
+.sidebar button:hover {
+    background: #475569;
+}
+
+/* MAIN */
+.main {
+    flex: 1;
+    padding: 30px;
+}
+
+.section {
+    display: none;
+}
+
+/* INPUTS */
+input, select, button {
+    padding: 10px;
+    margin: 6px 0;
+    width: 100%;
+}
+
+/* ================= AVATAR ================= */
+.avatar-container {
+    width: 240px;
+    margin: auto;
+    text-align: center;
+}
+
+.head {
+    width: 70px;
+    height: 70px;
+    background: #fde68a;
+    border-radius: 50%;
+    margin: auto;
+}
+
+.body {
+    width: 170px;
+    height: 170px;
+    background: #fde68a;
+    border-radius: 20px;
+    margin: auto;
+    position: relative;
+}
+
+.shirt {
+    height: 85px;
+    position: absolute;
+    top: 45px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    font-weight: bold;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+}
+
+.small { width: 70px; background: #22c55e; }
+.medium { width: 105px; background: #2563eb; }
+.large { width: 135px; background: #dc2626; }
+
+.legs {
+    width: 90px;
+    height: 100px;
+    background: #374151;
+    margin: auto;
+    border-radius: 10px;
+}
+
+/* VISUALIZATION */
+.visual-container {
+    width: 100%;
+    max-width: 900px;
+    margin: auto;
+}
+canvas {
+    width: 100% !important;
+    height: 400px !important;
+}
+
+/* SUMMARY BOX */
+.summary-box {
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    max-width: 800px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+    <h2>Menu</h2>
+    <button onclick="showSection('file')">File Input</button>
+    <button onclick="showSection('form')">Manual Input</button>
+    <button onclick="showSection('avatar')">Fit Avatar</button>
+    <button onclick="showSection('visual')">Visualization</button>
+    <button onclick="showSection('summary')">Size Summary</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+<!-- FILE INPUT -->
+<div id="file" class="section">
+    <h2>CSV File Upload</h2>
+    <input type="file" id="csvFile">
+    <button onclick="uploadFile()">Analyze File</button>
+    <pre id="fileResult"></pre>
+</div>
+
+<!-- MANUAL INPUT -->
+<div id="form" class="section">
+    <h2>Manual Input</h2>
+
+    <input id="height" placeholder="Height (cm)">
+    <input id="weight" placeholder="Weight (kg)">
+    <input id="chest" placeholder="Chest (cm)">
+    <input id="waist" placeholder="Waist (cm)">
+
+    <select id="brand">
+        <option>Nike</option>
+        <option>Adidas</option>
+        <option>Puma</option>
+        <option>H&M</option>
+    </select>
+
+    <select id="category">
+        <option>TShirt</option>
+        <option>Shirt</option>
+        <option>Top</option>
+    </select>
+
+    <button onclick="predict()">Predict Size</button>
+    <h3 id="result"></h3>
+</div>
+
+<!-- AVATAR -->
+<div id="avatar" class="section">
+    <h2>Virtual Fit Preview</h2>
+
+    <div class="avatar-container">
+        <div class="head"></div>
+        <div class="body">
+            <div id="shirt" class="shirt medium">
+                <span id="shirtText">M</span>
+            </div>
+        </div>
+        <div class="legs"></div>
+    </div>
+</div>
+
+<!-- VISUALIZATION -->
+<div id="visual" class="section">
+    <h2>Predicted Size Visualization</h2>
+    <div class="visual-container">
+        <canvas id="chart"></canvas>
+    </div>
+</div>
+
+<!-- SIZE SUMMARY -->
+<div id="summary" class="section">
+    <h2>Size Recommendation Summary</h2>
+    <div class="summary-box">
+        <p id="summaryText">
+            Submit input values to view a detailed size recommendation summary.
+        </p>
+    </div>
+</div>
+
+</div>
+
+<script>
+let chartInstance = null;
+
+/* SECTION SWITCH */
+function showSection(id) {
+    document.querySelectorAll('.section').forEach(s => s.style.display = "none");
+    document.getElementById(id).style.display = "block";
+}
+
+/* MANUAL PREDICTION */
+function predict() {
+    fetch("http://127.0.0.1:5000/predict", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+            height: height.value,
+            weight: weight.value,
+            chest: chest.value,
+            waist: waist.value,
+            brand: brand.value,
+            category: category.value
+        })
+    })
+    .then(r => r.json())
+    .then(d => {
+        result.innerText = "Recommended Size: " + d.recommended_size;
+        updateAvatar(d.recommended_size);
+        drawChart(d.recommended_size);
+        updateSummary(d.recommended_size);
+    });
+}
+
+/* FILE UPLOAD */
+function uploadFile() {
+    let fd = new FormData();
+    fd.append("file", csvFile.files[0]);
+
+    fetch("http://127.0.0.1:5000/predict-file", {
+        method: "POST",
+        body: fd
+    })
+    .then(r => r.json())
+    .then(d => {
+        fileResult.innerText = JSON.stringify(d, null, 2);
+    });
+}
+
+/* AVATAR UPDATE */
+function updateAvatar(size) {
+    let shirt = document.getElementById("shirt");
+    let text = document.getElementById("shirtText");
+    shirt.className = "shirt " + (size==="S"?"small":size==="M"?"medium":"large");
+    text.innerText = size;
+}
+
+/* CHART */
+function drawChart(size) {
+    if(chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(chart, {
+        type: "bar",
+        data: {
+            labels: ["S","M","L"],
+            datasets: [{
+                label: "Predicted Size",
+                data: [size==="S"?1:0, size==="M"?1:0, size==="L"?1:0],
+                backgroundColor: ["#22c55e","#2563eb","#dc2626"]
+            }]
+        }
+    });
+}
+
+/* ENHANCED SUMMARY */
+function updateSummary(size) {
+    let explanation = "";
+    let confidence = "";
+
+    if (size === "S") {
+        explanation = "Your measurements indicate a slim body profile with lower chest and waist values.";
+        confidence = "High confidence due to compact measurement range.";
+    } else if (size === "M") {
+        explanation = "Your body measurements are well balanced, matching standard fit proportions.";
+        confidence = "Medium to high confidence based on proportional dimensions.";
+    } else {
+        explanation = "Your chest and waist measurements suggest the need for extra garment space.";
+        confidence = "High confidence as broader dimensions strongly indicate this size.";
+    }
+
+    summaryText.innerHTML = `
+        <strong>Recommended Size:</strong> ${size}<br><br>
+
+        <strong>Fit Explanation:</strong><br>
+        ${explanation}<br><br>
+
+        <strong>Brand Influence:</strong><br>
+        The selected brand (${brand.value}) follows consistent sizing standards and the recommendation is adjusted accordingly.<br><br>
+
+        <strong>Confidence Level:</strong><br>
+        ${confidence}<br><br>
+
+        <strong>User Tip:</strong><br>
+        Consider fabric stretch and personal comfort preference before finalizing your purchase.
+    `;
+}
+
+/* DEFAULT VIEW */
+showSection("file");
+</script>
+
+</body>
+</html>
