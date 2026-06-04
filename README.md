@@ -1,0 +1,2 @@
+# Smart-Clothing-Recommendation-System-Using-E-Commerce-and-Big-Data-Analytics
+Smart Clothing Recommendation System using E-Commerce and Big Data Analytics. This project analyzes user preferences, browsing history, purchase behavior, and product trends to deliver personalized clothing recommendations, enhancing customer experience and supporting data-driven decision making in online fashion retail.
